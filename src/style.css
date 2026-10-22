@@ -41,3 +41,35 @@ h1 {
   border-radius: 8px;
   touch-action: none;
 }
+
+
+/* Footer */
+
+.game-container {
+  min-height: calc(100vh - 48px);
+}
+
+.site-footer {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  padding: 12px 16px;
+
+  color: #94a3b8;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.site-footer a {
+  color: #38bdf8;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.site-footer a:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}

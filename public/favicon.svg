@@ -1,0 +1,19 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#101827"></rect>
+
+  <!-- Bricks -->
+  <rect x="7" y="10" width="14" height="9" rx="2" fill="#ef4444"></rect>
+  <rect x="25" y="10" width="14" height="9" rx="2" fill="#f97316"></rect>
+  <rect x="43" y="10" width="14" height="9" rx="2" fill="#facc15"></rect>
+
+  <rect x="7" y="23" width="14" height="9" rx="2" fill="#22c55e"></rect>
+  <rect x="25" y="23" width="14" height="9" rx="2" fill="#38bdf8"></rect>
+  <rect x="43" y="23" width="14" height="9" rx="2" fill="#a78bfa"></rect>
+
+  <!-- Ball -->
+  <circle cx="32" cy="43" r="4.5" fill="#ffffff"></circle>
+
+  <!-- Paddle -->
+  <rect x="18" y="53" width="28" height="5" rx="2.5" fill="#38bdf8"></rect>
+</svg>
