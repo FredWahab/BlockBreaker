@@ -1,4 +1,19 @@
 
+/* ==========================================================
+   BLOCK BREAKER — ARCADE EDITION
+   Responsive Desktop / Mobile Styles
+   ========================================================== */
+
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #e2e8f0;
+  background-color: #080d18;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -6,70 +21,430 @@
 html,
 body {
   margin: 0;
+  padding: 0;
   min-height: 100%;
+  width: 100%;
 }
 
 body {
-  background: #101827;
-  color: #ffffff;
-  font-family: Arial, Helvetica, sans-serif;
+  min-width: 280px;
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      #203155 0%,
+      #101827 48%,
+      #080c17 100%
+    );
+
+  color: #e2e8f0;
 }
 
+/* ==========================================================
+   Main Layout
+   ========================================================== */
+
 .game-container {
-  min-height: 100vh;
+  width: 100%;
+  min-height: calc(100vh - 58px);
+
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 20px;
+
+  gap: 18px;
+  padding: 24px 16px 18px;
 }
 
-h1 {
-  margin: 0;
-  font-size: 2rem;
+/* ==========================================================
+   Header
+   ========================================================== */
+
+.game-header {
+  width: 100%;
   text-align: center;
+  flex-shrink: 0;
+}
+
+.game-heading h1 {
+  margin: 0;
+
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+
+  color: #f8fafc;
+
+  text-shadow:
+    0 0 20px rgba(56, 189, 248, 0.3);
+}
+
+.game-heading p {
+  margin: 7px 0 0;
+
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+
+  color: #38bdf8;
+}
+
+/* ==========================================================
+   Game Panel
+   ========================================================== */
+
+.game-panel {
+  width: 100%;
+  max-width: 800px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  gap: 14px;
+  min-width: 0;
 }
 
 #gameCanvas {
   display: block;
+
   width: 100%;
-  max-width: 800px;
   height: auto;
+
   background: #080d18;
-  border: 2px solid #334155;
-  border-radius: 8px;
+
+  border: 1px solid #475569;
+  border-radius: 10px;
+
+  box-shadow:
+    0 0 0 4px rgba(15, 23, 42, 0.7),
+    0 18px 65px rgba(0, 0, 0, 0.4),
+    0 0 35px rgba(56, 189, 248, 0.12);
+
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
+/* ==========================================================
+   Game Controls
+   ========================================================== */
 
-/* Footer */
+.game-controls {
+  width: 100%;
 
-.game-container {
-  min-height: calc(100vh - 48px);
-}
-
-.site-footer {
-  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
+
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.game-controls button {
+  min-width: 120px;
+  min-height: 42px;
+
+  padding: 10px 18px;
+
+  border: 1px solid #475569;
+  border-radius: 8px;
+
+  background: #1e293b;
+  color: #e2e8f0;
+
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.game-controls button:hover {
+  background: #334155;
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.game-controls button:active {
+  transform: scale(0.97);
+}
+
+.game-controls button:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+}
+
+/* ==========================================================
+   Footer
+   ========================================================== */
+
+.site-footer {
+  min-height: 58px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
   gap: 4px;
+  padding: 14px 16px;
 
-  padding: 12px 16px;
-
-  color: #94a3b8;
   font-size: 0.85rem;
   text-align: center;
+
+  color: #94a3b8;
 }
 
 .site-footer a {
   color: #38bdf8;
   text-decoration: none;
+
   transition: color 0.2s ease;
 }
 
 .site-footer a:hover {
   color: #ffffff;
   text-decoration: underline;
+}
+
+.site-footer a:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+}
+
+/* ==========================================================
+   Tablets
+   ========================================================== */
+
+@media (max-width: 768px) {
+  .game-container {
+    min-height: calc(100dvh - 52px);
+
+    justify-content: flex-start;
+
+    gap: 14px;
+    padding: 16px 12px 12px;
+  }
+
+  .game-heading h1 {
+    font-size: 1.9rem;
+  }
+
+  .game-heading p {
+    font-size: 0.72rem;
+  }
+
+  .game-panel {
+    max-width: 100%;
+    gap: 12px;
+  }
+
+  #gameCanvas {
+    max-width: 100%;
+  }
+
+  .site-footer {
+    min-height: 52px;
+    padding: 10px 12px;
+  }
+}
+
+/* ==========================================================
+   Mobile Portrait
+   ========================================================== */
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .game-container {
+    min-height: calc(100dvh - 44px);
+
+    justify-content: flex-start;
+    gap: 10px;
+
+    padding: 10px 8px 8px;
+  }
+
+  .game-heading h1 {
+    font-size: 1.4rem;
+    letter-spacing: 0.08em;
+  }
+
+  .game-heading p {
+    margin-top: 3px;
+
+    font-size: 0.58rem;
+    letter-spacing: 0.22em;
+  }
+
+  .game-panel {
+    gap: 10px;
+  }
+
+  #gameCanvas {
+    width: auto;
+
+    max-width: 100%;
+    max-height: calc(100dvh - 155px);
+
+    height: auto;
+
+    border-radius: 6px;
+
+    box-shadow:
+      0 0 0 2px rgba(15, 23, 42, 0.7),
+      0 8px 25px rgba(0, 0, 0, 0.35);
+  }
+
+  .game-controls {
+    gap: 7px;
+  }
+
+  .game-controls button {
+    flex: 1;
+    min-width: 0;
+    min-height: 42px;
+
+    padding: 9px 5px;
+    font-size: 0.78rem;
+  }
+
+  .site-footer {
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ==========================================================
+   Mobile Landscape
+   ========================================================== */
+
+@media (orientation: landscape) and (max-height: 600px) {
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  .game-container {
+    min-height: 100dvh;
+    height: 100dvh;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+
+    gap: 4px;
+    padding: 4px 8px 4px;
+
+    overflow: hidden;
+  }
+
+  /* Hide decorative title to maximize gameplay space. */
+  .game-header {
+    display: none;
+  }
+
+  .game-panel {
+    flex: 1;
+    min-height: 0;
+
+    width: 100%;
+    max-width: none;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    gap: 5px;
+  }
+
+  #gameCanvas {
+    flex: 0 1 auto;
+
+    width: auto;
+    height: auto;
+
+    max-width: 100%;
+    max-height: calc(100dvh - 65px);
+
+    border-radius: 4px;
+
+    box-shadow: none;
+  }
+
+  .game-controls {
+    height: 43px;
+    min-height: 43px;
+
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .game-controls button {
+    min-width: 90px;
+    min-height: 35px;
+
+    padding: 6px 12px;
+
+    font-size: 0.75rem;
+    border-radius: 6px;
+  }
+
+  /* Footer is hidden in landscape gameplay mode. */
+  .site-footer {
+    display: none;
+  }
+}
+
+/* ==========================================================
+   Very Short Landscape Screens
+   ========================================================== */
+
+@media (orientation: landscape) and (max-height: 390px) {
+  .game-container {
+    padding: 2px 6px;
+    gap: 2px;
+  }
+
+  .game-panel {
+    gap: 3px;
+  }
+
+  #gameCanvas {
+    max-height: calc(100dvh - 47px);
+  }
+
+  .game-controls {
+    height: 36px;
+    min-height: 36px;
+    gap: 6px;
+  }
+
+  .game-controls button {
+    min-height: 30px;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+  }
+}
+
+/* ==========================================================
+   Reduced Motion
+   ========================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .game-controls button,
+  .site-footer a {
+    transition: none;
+  }
 }
