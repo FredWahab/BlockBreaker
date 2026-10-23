@@ -3,17 +3,18 @@
    BLOCK BREAKER — GAME CONTROLLER
 
    Handles:
-   - Game loop and state
-   - Level progression and checkpoints
-   - Paddle movement
-   - Brick destruction and power-ups
-   - Cheat integration
-   - Leaderboard eligibility
+   - Main game loop and state management
+   - Responsive desktop and mobile layouts
+   - 30-level campaign and checkpoints
+   - Brick generation and destruction
+   - Player paddle and power-ups
+   - Console cheat integration
+   - Leaderboard eligibility and run tracking
 
-   Physics.js handles collisions.
-   Render.js handles drawing.
-   Levels.js handles stage definitions.
-   Cheats.js handles developer console commands.
+   Physics.js — Ball and defender collisions
+   Render.js  — Canvas rendering
+   Levels.js  — Level configurations
+   Cheats.js  — Developer console commands
    ========================================================== */
 
 import { Input } from "./Input.js";
@@ -27,6 +28,10 @@ import {
   isCheckpoint,
   MAX_LEVEL
 } from "./Levels.js";
+
+// ==========================================================
+// Power-up Definitions
+// ==========================================================
 
 const POWER_TYPES = [
   "expand",
@@ -44,18 +49,25 @@ const POWER_INFO = {
   life: "EXTRA LIFE"
 };
 
+// ==========================================================
+// Game Class
+// ==========================================================
+
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
 
+    // Core systems.
     this.input = new Input(canvas);
     this.audio = new Audio();
 
+    // Playfield.
     this.width = 800;
     this.height = 600;
     this.layout = "desktop";
 
+    // Player paddle.
     this.paddle = {
       x: 340,
       y: 548,
@@ -64,6 +76,7 @@ export class Game {
       speed: 600
     };
 
+    // Game objects.
     this.balls = [];
     this.bricks = [];
     this.defender = null;
@@ -71,16 +84,23 @@ export class Game {
     this.shots = [];
     this.particles = [];
 
+    // Campaign.
     this.level = 1;
     this.maxLevel = MAX_LEVEL;
     this.checkpoint = 1;
 
+    this.levelConfig = null;
+    this.baseBallSpeed = 300;
+
+    // Player progress.
     this.score = 0;
     this.lives = 3;
 
+    // States: ready, playing, paused, won, lost.
     this.state = "ready";
     this.previousState = "ready";
 
+    // Temporary power-up timers.
     this.effects = {
       expand: 0,
       slow: 0,
@@ -89,24 +109,37 @@ export class Game {
 
     this.shotTimer = 0;
 
+    // Visual effects.
     this.shake = 0;
     this.banner = {
       text: "",
       time: 0
     };
 
+    // Timing.
     this.time = 0;
     this.lastTime = null;
     this.running = false;
 
-    this.levelConfig = null;
-    this.baseBallSpeed = 300;
+    // ======================================================
+    // Leaderboard Tracking
+    // ======================================================
 
-    // Leaderboard tracking.
     this.runId = 1;
     this.runFinished = false;
-    this.highestLevel = 1;
     this.completed = false;
+    this.highestLevel = 1;
+
+    // True when the current run restarted from a
+    // checkpoint instead of beginning at Level 1.
+    this.continuedFromCheckpoint = false;
+
+    // This callback is registered by main.js.
+    this.onRunFinished = null;
+
+    // ======================================================
+    // Initialization
+    // ======================================================
 
     this.updateLayout(true);
 
@@ -115,7 +148,6 @@ export class Game {
 
     this.loadLevel(1);
 
-    // Install console commands after the game is initialized.
     this.cheats = new Cheats(this);
 
     this.loop = this.loop.bind(this);
@@ -192,12 +224,14 @@ export class Game {
 
     const paddleCenter = initial
       ? 0.5
-      : (this.paddle.x + this.paddle.width / 2) /
-        oldWidth;
+      : (
+          this.paddle.x +
+          this.paddle.width / 2
+        ) / oldWidth;
 
     this.layout = newLayout;
 
-    switch (newLayout) {
+    switch (this.layout) {
       case "portrait":
         this.width = 480;
         this.height = 760;
@@ -211,11 +245,14 @@ export class Game {
       default:
         this.width = 800;
         this.height = 600;
+        break;
     }
 
     this.canvas.width = this.width;
     this.canvas.height = this.height;
 
+    // Resize the paddle while preserving its
+    // relative horizontal position.
     this.paddle.width = this.shouldUseWidePaddle()
       ? this.getExpandedPaddleWidth()
       : this.getNormalPaddleWidth();
@@ -223,7 +260,8 @@ export class Game {
     this.paddle.height =
       this.layout === "landscape" ? 14 : 16;
 
-    this.paddle.y = this.height -
+    this.paddle.y =
+      this.height -
       (this.layout === "landscape" ? 35 : 52);
 
     this.paddle.x = this.clamp(
@@ -236,9 +274,23 @@ export class Game {
     if (initial) return;
 
     const scaleX = this.width / oldWidth;
-    const scaleY = this.height / oldHeight;
+
+    // Preserve the ball's relative position within
+    // the playable vertical region when rotating.
+    const oldPaddleY =
+      oldHeight -
+      (
+        oldHeight === 450
+          ? 35
+          : 52
+      );
 
     for (const ball of this.balls) {
+      const verticalRatio =
+        oldPaddleY > 0
+          ? ball.y / oldPaddleY
+          : 0.5;
+
       ball.radius =
         this.layout === "portrait" ? 9 : 8;
 
@@ -249,7 +301,7 @@ export class Game {
       );
 
       ball.y = this.clamp(
-        ball.y * scaleY,
+        verticalRatio * this.paddle.y,
         ball.radius,
         this.height - ball.radius
       );
@@ -259,19 +311,24 @@ export class Game {
 
     for (const power of this.powers) {
       power.x *= scaleX;
-      power.y *= scaleY;
+      power.y *= this.height / oldHeight;
     }
 
     for (const shot of this.shots) {
       shot.x *= scaleX;
-      shot.y *= scaleY;
+      shot.y *= this.height / oldHeight;
     }
 
+    // Clear transient visuals after resizing.
     this.particles = [];
     this.input.pointerX = null;
 
+    // Reposition the existing bricks without
+    // regenerating or restoring destroyed bricks.
     this.arrangeBricks();
-    this.createDefender();
+
+    // Recalculate defender movement boundaries.
+    this.createDefender(true);
 
     if (this.state === "ready") {
       this.attachBall();
@@ -328,7 +385,8 @@ export class Game {
     );
 
     this.levelConfig = getLevel(this.level);
-    this.baseBallSpeed = this.levelConfig.ballSpeed;
+    this.baseBallSpeed =
+      this.levelConfig.ballSpeed;
 
     this.highestLevel = Math.max(
       this.highestLevel,
@@ -351,15 +409,17 @@ export class Game {
     this.shotTimer = 0;
     this.shake = 0;
 
-    // Cheats persist between levels.
+    // Preserve infinite lasers across levels.
     if (this.cheats?.flags.laser) {
       this.effects.laser = 3600;
     }
 
     this.updatePaddleWidth();
-
     this.createBricks();
-    this.createDefender();
+
+    // Every new level starts with a fresh defender.
+    this.createDefender(false);
+
     this.resetBall();
 
     this.input.actionRequested = false;
@@ -373,6 +433,10 @@ export class Game {
       );
     }
   }
+
+  // ==========================================================
+  // Brick Generation
+  // ==========================================================
 
   createBricks() {
     this.bricks = [];
@@ -392,11 +456,12 @@ export class Game {
 
         if (!type) return;
 
-        const health = type === "armored"
-          ? config.armorHealth
-          : type === "permanent"
-            ? Infinity
-            : 1;
+        const health =
+          type === "armored"
+            ? config.armorHealth
+            : type === "permanent"
+              ? Infinity
+              : 1;
 
         this.bricks.push({
           row: rowIndex,
@@ -426,53 +491,54 @@ export class Game {
     const portrait = this.layout === "portrait";
     const landscape = this.layout === "landscape";
 
-    const columns = portrait ? 6 : 10;
+    // All level patterns are defined with 10 columns.
+    // Preserve their exact structure on every device.
+    const columns = 10;
 
-    const gap = landscape ? 6 : 7;
-    const margin = portrait ? 18 : 23;
+    const gap = portrait
+      ? 4
+      : landscape
+        ? 6
+        : 7;
+
+    const margin = portrait ? 10 : 23;
 
     const brickWidth =
-      (this.width -
+      (
+        this.width -
         margin * 2 -
-        gap * (columns - 1)) /
-      columns;
+        gap * (columns - 1)
+      ) / columns;
 
-    const brickHeight = landscape ? 17 : 22;
+    const brickHeight = landscape
+      ? 17
+      : portrait
+        ? 20
+        : 22;
+
     const top = landscape ? 47 : 78;
 
-    if (portrait) {
-      const ordered = [...this.bricks].sort(
-        (a, b) => a.row - b.row || a.col - b.col
-      );
+    for (const brick of this.bricks) {
+      // Preserve empty spaces, gaps, and patterns
+      // using the original row/column coordinates.
+      brick.x =
+        margin +
+        brick.col * (brickWidth + gap);
 
-      ordered.forEach((brick, index) => {
-        const row = Math.floor(index / columns);
-        const col = index % columns;
+      brick.y =
+        top +
+        brick.row * (brickHeight + gap);
 
-        brick.x =
-          margin + col * (brickWidth + gap);
-
-        brick.y =
-          top + row * (brickHeight + gap);
-
-        brick.width = brickWidth;
-        brick.height = brickHeight;
-      });
-    } else {
-      for (const brick of this.bricks) {
-        brick.x =
-          margin + brick.col * (brickWidth + gap);
-
-        brick.y =
-          top + brick.row * (brickHeight + gap);
-
-        brick.width = brickWidth;
-        brick.height = brickHeight;
-      }
+      brick.width = brickWidth;
+      brick.height = brickHeight;
     }
   }
 
-  createDefender() {
+  // ==========================================================
+  // Moving Defensive Paddle
+  // ==========================================================
+
+  createDefender(preservePosition = false) {
     const config = this.levelConfig?.defender;
 
     if (!config) {
@@ -480,7 +546,8 @@ export class Game {
       return;
     }
 
-    const oldDefender = this.defender;
+    const previous =
+      preservePosition ? this.defender : null;
 
     const width = Math.min(
       config.width,
@@ -492,18 +559,34 @@ export class Game {
 
     const lowestBrick = this.bricks.reduce(
       (bottom, brick) =>
-        Math.max(bottom, brick.y + brick.height),
+        Math.max(
+          bottom,
+          brick.y + brick.height
+        ),
       0
     );
 
     const preferredY =
       lowestBrick +
-      (this.layout === "landscape" ? 20 : 30);
+      (
+        this.layout === "landscape"
+          ? 20
+          : 30
+      );
+
+    // Keep the defender below the brick formation
+    // but safely above the player's paddle.
+    const maximumY =
+      this.paddle.y -
+      (
+        this.layout === "landscape"
+          ? 75
+          : 110
+      );
 
     const y = Math.min(
       preferredY,
-      this.paddle.y -
-        (this.layout === "landscape" ? 75 : 110)
+      maximumY
     );
 
     const centerX = this.width / 2;
@@ -524,24 +607,34 @@ export class Game {
     );
 
     const positionRatio =
-      oldDefender && oldDefender.maxX > oldDefender.minX
-        ? (oldDefender.x - oldDefender.minX) /
-          (oldDefender.maxX - oldDefender.minX)
+      previous &&
+      previous.maxX > previous.minX
+        ? (
+            previous.x - previous.minX
+          ) / (
+            previous.maxX - previous.minX
+          )
         : 0.5;
 
     this.defender = {
-      x: minX + this.clamp(positionRatio, 0, 1) *
+      x:
+        minX +
+        this.clamp(positionRatio, 0, 1) *
         (maxX - minX),
       y,
       width,
       height,
       speed: config.speed,
-      direction: oldDefender?.direction ?? 1,
+      direction: previous?.direction ?? 1,
       minX,
       maxX,
       active: true
     };
   }
+
+  // ==========================================================
+  // Campaign Progression
+  // ==========================================================
 
   nextLevel() {
     if (this.level >= this.maxLevel) {
@@ -561,18 +654,29 @@ export class Game {
         this.lives + 1
       );
 
-      this.showBanner("CHECKPOINT!", 2);
+      this.showBanner(
+        "CHECKPOINT!",
+        2
+      );
     } else {
-      this.showBanner(`LEVEL ${next}`, 2);
+      this.showBanner(
+        `LEVEL ${next}`,
+        2
+      );
     }
 
     this.audio.play("level");
   }
 
+  // ==========================================================
+  // Restart and Checkpoint Continuation
+  // ==========================================================
+
   restart(fromCheckpoint = false) {
-    // Explicit restart ends the current run without
-    // submitting a score. Game-over and victory are
-    // handled separately by finishRun().
+    const checkpointContinue =
+      fromCheckpoint && this.checkpoint > 1;
+
+    // A new attempt gets its own run ID.
     this.runId++;
     this.runFinished = false;
     this.completed = false;
@@ -580,30 +684,53 @@ export class Game {
     this.score = 0;
     this.lives = 3;
 
-    const target = fromCheckpoint
-      ? this.checkpoint
-      : 1;
+    this.continuedFromCheckpoint =
+      checkpointContinue;
 
-    if (!fromCheckpoint) {
+    const startingLevel =
+      checkpointContinue ? this.checkpoint : 1;
+
+    if (!checkpointContinue) {
       this.checkpoint = 1;
     }
 
-    this.highestLevel = target;
+    this.highestLevel = startingLevel;
 
     this.paddle.x =
-      (this.width - this.getNormalPaddleWidth()) / 2;
+      (
+        this.width -
+        this.getNormalPaddleWidth()
+      ) / 2;
 
-    this.loadLevel(target);
+    this.loadLevel(startingLevel);
+
+    if (checkpointContinue) {
+      console.log(
+        `[Block Breaker] Continuing from Level ${startingLevel}.`
+      );
+
+      console.log(
+        "[Block Breaker] Checkpoint continues are " +
+        "not eligible for leaderboard submission."
+      );
+    } else {
+      console.log(
+        "[Block Breaker] New game started at Level 1."
+      );
+    }
 
     this.audio.play("start");
   }
 
   // ==========================================================
-  // Leaderboard Run Tracking
+  // Leaderboard Eligibility
   // ==========================================================
 
   isLeaderboardEligible() {
-    return !this.cheats.used;
+    return (
+      !this.continuedFromCheckpoint &&
+      !this.cheats.used
+    );
   }
 
   finishRun(completed = false) {
@@ -621,8 +748,6 @@ export class Game {
       finishedAt: new Date().toISOString()
     };
 
-    // The leaderboard module will register this callback
-    // once we create Leaderboard.js.
     if (typeof this.onRunFinished === "function") {
       this.onRunFinished(result);
     }
@@ -650,6 +775,7 @@ export class Game {
     const speed = this.baseBallSpeed;
 
     const vx = speed * 0.55;
+
     const vy = -Math.sqrt(
       speed * speed - vx * vx
     );
@@ -675,10 +801,12 @@ export class Game {
     const ball = this.balls[0];
 
     ball.x =
-      this.paddle.x + this.paddle.width / 2;
+      this.paddle.x +
+      this.paddle.width / 2;
 
     ball.y =
-      this.paddle.y - ball.radius - 4;
+      this.paddle.y -
+      ball.radius - 4;
 
     ball.trail = [];
   }
@@ -691,7 +819,7 @@ export class Game {
   }
 
   // ==========================================================
-  // Game State
+  // Pause Management
   // ==========================================================
 
   togglePause() {
@@ -706,6 +834,10 @@ export class Game {
     }
   }
 
+  // ==========================================================
+  // Losing a Life
+  // ==========================================================
+
   loseLife() {
     this.audio.play("lose");
 
@@ -715,12 +847,15 @@ export class Game {
     this.effects = {
       expand: 0,
       slow: 0,
-      laser: this.cheats.flags.laser ? 3600 : 0
+      laser:
+        this.cheats.flags.laser
+          ? 3600
+          : 0
     };
 
     this.updatePaddleWidth();
 
-    // God mode resets the ball without losing a life.
+    // God mode resets the ball without losing lives.
     if (this.cheats.flags.god) {
       this.state = "ready";
       this.resetBall();
@@ -802,7 +937,9 @@ export class Game {
     if (this.state === "ready") {
       this.attachBall();
 
-      if (action) this.launch();
+      if (action) {
+        this.launch();
+      }
 
       return;
     }
@@ -826,13 +963,15 @@ export class Game {
       this.shake - dt * 15
     );
 
-    // Slow cheat affects the game simulation.
-    const physicsDt = this.cheats.flags.slow
-      ? dt * 0.65
-      : dt;
+    const physicsDt =
+      this.cheats.flags.slow
+        ? dt * 0.65
+        : dt;
 
     this.physics.update(physicsDt);
 
+    // Permanent bricks do not count toward
+    // completion of a level.
     if (
       this.state === "playing" &&
       this.bricks.every(
@@ -845,13 +984,19 @@ export class Game {
     }
   }
 
+  // ==========================================================
+  // Player Paddle
+  // ==========================================================
+
   updatePaddle(dt) {
     const direction =
       this.input.getHorizontalDirection();
 
     if (direction !== 0) {
       this.paddle.x +=
-        direction * this.paddle.speed * dt;
+        direction *
+        this.paddle.speed *
+        dt;
     } else if (this.input.pointerX !== null) {
       this.paddle.x =
         this.input.pointerX -
@@ -866,7 +1011,7 @@ export class Game {
   }
 
   // ==========================================================
-  // Brick Damage and Destruction
+  // Brick Destruction
   // ==========================================================
 
   damageBrick(brick, damage = 1, chain = false) {
@@ -921,25 +1066,45 @@ export class Game {
 
     if (
       !chain &&
-      Math.random() < this.levelConfig.powerChance
+      Math.random() <
+        this.levelConfig.powerChance
     ) {
       this.dropPower(brick);
     }
 
+    // Explosions damage nearby destructible bricks.
     if (brick.type === "explosive") {
-      this.shake = Math.max(this.shake, 0.65);
+      this.shake = Math.max(
+        this.shake,
+        0.65
+      );
 
       const nearby = this.bricks.filter(other => {
-        if (!other.active) return false;
+        if (
+          !other.active ||
+          other.type === "permanent"
+        ) {
+          return false;
+        }
 
         const dx = Math.abs(
-          (other.x + other.width / 2) -
-          (brick.x + brick.width / 2)
+          (
+            other.x +
+            other.width / 2
+          ) - (
+            brick.x +
+            brick.width / 2
+          )
         );
 
         const dy = Math.abs(
-          (other.y + other.height / 2) -
-          (brick.y + brick.height / 2)
+          (
+            other.y +
+            other.height / 2
+          ) - (
+            brick.y +
+            brick.height / 2
+          )
         );
 
         return (
@@ -955,13 +1120,14 @@ export class Game {
   }
 
   // ==========================================================
-  // Power-ups
+  // Power-up Drops
   // ==========================================================
 
   dropPower(brick) {
     const type = POWER_TYPES[
       Math.floor(
-        Math.random() * POWER_TYPES.length
+        Math.random() *
+        POWER_TYPES.length
       )
     ];
 
@@ -985,9 +1151,11 @@ export class Game {
 
       if (
         power.x + power.size / 2 > p.x &&
-        power.x - power.size / 2 < p.x + p.width &&
+        power.x - power.size / 2 <
+          p.x + p.width &&
         power.y + power.size / 2 > p.y &&
-        power.y - power.size / 2 < p.y + p.height
+        power.y - power.size / 2 <
+          p.y + p.height
       ) {
         this.applyPower(power.type);
         power.collected = true;
@@ -1000,6 +1168,10 @@ export class Game {
         power.y < this.height + 30
     );
   }
+
+  // ==========================================================
+  // Apply Power-ups
+  // ==========================================================
 
   applyPower(type) {
     this.showBanner(
@@ -1037,8 +1209,12 @@ export class Game {
               this.createBall(
                 ball.x,
                 ball.y,
-                Math.cos(angle + offset) * speed,
-                Math.sin(angle + offset) * speed
+                Math.cos(
+                  angle + offset
+                ) * speed,
+                Math.sin(
+                  angle + offset
+                ) * speed
               )
             );
           }
@@ -1057,9 +1233,10 @@ export class Game {
         break;
 
       case "laser":
-        this.effects.laser = this.cheats.flags.laser
-          ? 3600
-          : 12;
+        this.effects.laser =
+          this.cheats.flags.laser
+            ? 3600
+            : 12;
 
         this.shotTimer = 0;
         break;
@@ -1073,9 +1250,12 @@ export class Game {
     }
   }
 
+  // ==========================================================
+  // Temporary Effects
+  // ==========================================================
+
   updateEffects(dt) {
     for (const key of Object.keys(this.effects)) {
-      // Infinite laser cheat never runs down.
       if (
         key === "laser" &&
         this.cheats.flags.laser
@@ -1185,12 +1365,14 @@ export class Game {
     }
 
     this.shots = this.shots.filter(
-      shot => !shot.hit && shot.y > -20
+      shot =>
+        !shot.hit &&
+        shot.y > -20
     );
   }
 
   // ==========================================================
-  // Particles
+  // Particle Effects
   // ==========================================================
 
   spawnParticles(x, y, color, count) {
@@ -1211,7 +1393,8 @@ export class Game {
         vy: Math.sin(angle) * speed,
         life,
         maxLife: life,
-        radius: 1.5 + Math.random() * 3,
+        radius:
+          1.5 + Math.random() * 3,
         color
       });
     }
@@ -1238,9 +1421,20 @@ export class Game {
     );
   }
 
+  // ==========================================================
+  // Notifications
+  // ==========================================================
+
   showBanner(text, time = 1.3) {
-    this.banner = { text, time };
+    this.banner = {
+      text,
+      time
+    };
   }
+
+  // ==========================================================
+  // Rendering
+  // ==========================================================
 
   render() {
     this.renderer.render();

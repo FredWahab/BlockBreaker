@@ -6,8 +6,9 @@
    - Game initialization
    - Interface controls
    - Developer console cheats
-   - Arcade high-score leaderboard
-   - Player name entry
+   - Arcade leaderboard
+   - High-score name entry
+   - Victory celebration timing
    - Mobile audio unlocking
    ========================================================== */
 
@@ -18,26 +19,35 @@ import { Leaderboard } from "./Leaderboard.js";
 import { LeaderboardUI } from "./LeaderboardUI.js";
 
 // ==========================================================
-// Initialize Game
+// Initialize
 // ==========================================================
 
 const canvas = document.getElementById("gameCanvas");
 
 const game = new Game(canvas);
 
-// ==========================================================
-// Initialize Leaderboard
-// ==========================================================
-
 const leaderboard = new Leaderboard();
 const leaderboardUI = new LeaderboardUI(game, leaderboard);
 
-// Track the number of the last submitted run.
-// Leaderboard.js also prevents duplicate submissions.
+// ==========================================================
+// Victory Celebration
+// ==========================================================
+
+// Give players time to appreciate completing all 30 levels
+// before asking them to enter their initials.
+
+const VICTORY_CELEBRATION_MS = 6000;
+
+let pendingVictoryResult = null;
+let victoryCelebrationStarted = 0;
+let victoryHoldUntil = 0;
+
 let lastFinishedRunId = null;
 
-// When a legitimate game ends, check whether its score
-// qualifies for the arcade leaderboard.
+// ==========================================================
+// Leaderboard Qualification
+// ==========================================================
+
 game.onRunFinished = (result) => {
   if (lastFinishedRunId === result.runId) {
     return;
@@ -45,17 +55,51 @@ game.onRunFinished = (result) => {
 
   lastFinishedRunId = result.runId;
 
+  // A completed campaign gets its own celebration before
+  // name entry, whether the run qualifies or not.
+  if (result.completed) {
+    victoryCelebrationStarted = performance.now();
+
+    victoryHoldUntil =
+      victoryCelebrationStarted + VICTORY_CELEBRATION_MS;
+
+    if (result.eligible && leaderboard.qualifies(result)) {
+      pendingVictoryResult = result;
+
+      console.log(
+        "[Block Breaker] Campaign complete! " +
+        "New high score — initials entry will follow " +
+        "the victory celebration."
+      );
+    } else {
+      pendingVictoryResult = null;
+
+      console.log(
+        "[Block Breaker] Campaign complete! " +
+        (
+          result.eligible
+            ? "Final score did not qualify for the top 10."
+            : "This run is not leaderboard eligible."
+        )
+      );
+    }
+
+    return;
+  }
+
+  // Ordinary game over: show qualifying initials entry
+  // immediately.
   if (!result.eligible) {
     console.log(
-      "[Block Breaker] Cheat-assisted run. " +
-      "Score is not eligible for the leaderboard."
+      "[Block Breaker] Cheat-assisted or checkpoint " +
+      "continued run. Leaderboard entry disabled."
     );
     return;
   }
 
   if (!leaderboard.qualifies(result)) {
     console.log(
-      "[Block Breaker] Game finished. " +
+      "[Block Breaker] Game over. " +
       "Score did not reach the top 10."
     );
     return;
@@ -66,34 +110,13 @@ game.onRunFinished = (result) => {
     "Enter your initials to save your record."
   );
 
-  // Automatically show the name-entry screen.
+  clearBufferedInput();
   leaderboardUI.showEntry(result);
 };
 
 // ==========================================================
-// Pause Gameplay While Leaderboard Is Open
+// Input Management
 // ==========================================================
-
-// The regular game loop continues rendering, but
-// gameplay updates are suspended while the leaderboard
-// is visible.
-//
-// This preserves the exact game state when viewing
-// high scores during an active level.
-
-const originalUpdate = game.update.bind(game);
-
-game.update = (dt) => {
-  if (leaderboardUI.isOpen()) {
-    return;
-  }
-
-  originalUpdate(dt);
-};
-
-// Clear any buffered input when entering/leaving a modal.
-// This prevents a Spacebar press or canvas tap from
-// unintentionally triggering gameplay afterward.
 
 function clearBufferedInput() {
   game.input.actionRequested = false;
@@ -102,13 +125,57 @@ function clearBufferedInput() {
   game.input.muteRequested = false;
 
   game.input.keys.clear();
+
   game.input.pointerDown = false;
   game.input.spaceDown = false;
   game.input.spaceDownTime = 0;
 }
 
 // ==========================================================
-// Game Controls
+// Suspend Gameplay for Modal and Victory Sequence
+// ==========================================================
+
+const originalUpdate = game.update.bind(game);
+
+game.update = (dt) => {
+  // Never update gameplay while a leaderboard screen is open.
+  if (leaderboardUI.isOpen()) {
+    return;
+  }
+
+  // When the player wins, prevent accidental key presses
+  // or taps from immediately restarting the campaign
+  // before the victory sequence has been displayed.
+  if (
+    game.state === "won" &&
+    victoryHoldUntil > 0
+  ) {
+    const now = performance.now();
+
+    if (now < victoryHoldUntil) {
+      clearBufferedInput();
+      return;
+    }
+
+    victoryHoldUntil = 0;
+
+    // Open the initials screen after the celebration.
+    if (pendingVictoryResult) {
+      const result = pendingVictoryResult;
+      pendingVictoryResult = null;
+
+      clearBufferedInput();
+
+      leaderboardUI.showEntry(result);
+      return;
+    }
+  }
+
+  originalUpdate(dt);
+};
+
+// ==========================================================
+// Interface Controls
 // ==========================================================
 
 const pauseButton = document.getElementById("pauseButton");
@@ -121,6 +188,7 @@ const restartButton = document.getElementById("restartButton");
 // Pause / Resume.
 pauseButton.addEventListener("click", () => {
   if (leaderboardUI.isOpen()) return;
+  if (victoryHoldUntil > 0) return;
 
   game.input.pauseRequested = true;
 });
@@ -137,6 +205,9 @@ soundButton.addEventListener("click", () => {
 highScoresButton.addEventListener("click", () => {
   if (leaderboardUI.isOpen()) return;
 
+  // Don't interrupt an unfinished victory celebration.
+  if (victoryHoldUntil > 0) return;
+
   clearBufferedInput();
   leaderboardUI.open();
 });
@@ -145,12 +216,20 @@ highScoresButton.addEventListener("click", () => {
 restartButton.addEventListener("click", () => {
   if (leaderboardUI.isOpen()) return;
 
+  // Prevent bypassing high-score name entry immediately
+  // after finishing the campaign.
+  if (victoryHoldUntil > 0) return;
+
   game.audio.unlock();
   game.restart();
+
+  pendingVictoryResult = null;
+  victoryHoldUntil = 0;
+  victoryCelebrationStarted = 0;
 });
 
 // ==========================================================
-// Keep Interface Labels Updated
+// Keep Buttons Synchronized
 // ==========================================================
 
 function updateControls() {
@@ -162,20 +241,22 @@ function updateControls() {
     ? "Resume"
     : "Pause";
 
+  const modalOpen = leaderboardUI.isOpen();
+  const victoryLocked = victoryHoldUntil > 0;
+
+  pauseButton.disabled = modalOpen || victoryLocked;
+  restartButton.disabled = modalOpen || victoryLocked;
+
+  highScoresButton.disabled = modalOpen || victoryLocked;
+
   requestAnimationFrame(updateControls);
 }
 
 updateControls();
 
 // ==========================================================
-// Modal Input Protection
+// Modal Keyboard Protection
 // ==========================================================
-
-// Prevent gameplay shortcuts from being activated while
-// interacting with the high-score interface.
-//
-// This works alongside the keyboard handling already
-// present in LeaderboardUI.js.
 
 document.addEventListener(
   "keyup",
@@ -200,9 +281,7 @@ document.addEventListener(
   true
 );
 
-// Clear buffered input when the leaderboard closes.
-// Wrap the UI's close method so both the Close and Back
-// buttons get the same behavior.
+// Clear leftover input when closing the leaderboard.
 
 const originalClose = leaderboardUI.close.bind(
   leaderboardUI
@@ -219,9 +298,6 @@ leaderboardUI.close = () => {
 // ==========================================================
 // Audio Unlocking
 // ==========================================================
-
-// Mobile browsers require user interaction before sound
-// playback. Preserve the existing Howler.js approach.
 
 const unlockAudio = () => {
   game.audio.unlock();
@@ -240,7 +316,7 @@ window.addEventListener(
 );
 
 // ==========================================================
-// Start Game
+// Start
 // ==========================================================
 
 game.start();
@@ -252,5 +328,6 @@ console.log(
 
 console.log(
   "[Block Breaker] Top 10 scores are saved locally. " +
-  "Cheat-assisted runs cannot submit scores."
+  "Cheat-assisted and checkpoint-continued runs " +
+  "cannot submit scores."
 );

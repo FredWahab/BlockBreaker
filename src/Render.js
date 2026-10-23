@@ -4,52 +4,47 @@
 
    Handles:
    - Background and playfield
-   - Normal, armored, explosive, and permanent bricks
+   - All brick types
    - Moving defensive paddle
-   - Player paddle
-   - Balls and trails
-   - Power-ups and laser projectiles
+   - Player paddle, balls, and trails
+   - Power-ups and lasers
    - Particle effects
-   - Score, lives, level, and active power-ups
-   - Start, pause, victory, and game-over screens
+   - HUD and menus
+   - Animated 30-level victory celebration
 
-   All gameplay logic remains outside this file.
+   Gameplay logic remains in Game.js and Physics.js.
    ========================================================== */
 
-import { getLevel, getWorld } from "./Levels.js";
+import { getLevel } from "./Levels.js";
 
 const POWER_INFO = {
-  expand: {
-    label: "W",
-    color: "#38bdf8",
-    name: "WIDE PADDLE"
-  },
-  multi: {
-    label: "3",
-    color: "#a78bfa",
-    name: "MULTIBALL"
-  },
-  slow: {
-    label: "S",
-    color: "#4ade80",
-    name: "SLOW BALL"
-  },
-  laser: {
-    label: "L",
-    color: "#fb7185",
-    name: "LASER"
-  },
-  life: {
-    label: "+",
-    color: "#facc15",
-    name: "EXTRA LIFE"
-  }
+  expand: { label: "W", color: "#38bdf8" },
+  multi: { label: "3", color: "#a78bfa" },
+  slow: { label: "S", color: "#4ade80" },
+  laser: { label: "L", color: "#fb7185" },
+  life: { label: "+", color: "#facc15" }
 };
+
+const CELEBRATION_COLORS = [
+  "#facc15",
+  "#fde68a",
+  "#38bdf8",
+  "#7dd3fc",
+  "#a78bfa",
+  "#4ade80",
+  "#ffffff"
+];
 
 export class Render {
   constructor(game) {
     this.game = game;
     this.ctx = game.ctx;
+
+    this.victoryParticles = [];
+    this.victoryStart = 0;
+    this.lastVictoryFrame = 0;
+    this.victoryRunId = null;
+    this.victoryBursts = 0;
   }
 
   // ========================================================
@@ -118,17 +113,17 @@ export class Render {
       case "lost":
         this.drawMenu(
           "GAME OVER",
-          `FINAL SCORE: ${game.score}`,
+          `FINAL SCORE: ${game.score.toLocaleString()}`,
           false
         );
         break;
 
       case "won":
-        this.drawMenu(
-          "YOU WIN!",
-          `FINAL SCORE: ${game.score}`,
-          false
-        );
+        this.drawVictory();
+        break;
+
+      default:
+        this.resetVictory();
         break;
     }
   }
@@ -142,27 +137,16 @@ export class Render {
   // ========================================================
 
   drawBackground() {
-    const game = this.game;
     const ctx = this.ctx;
+    const { width: w, height: h } = this.game;
 
-    const w = game.width;
-    const h = game.height;
-
-    ctx.fillStyle = "#080d18";
-    ctx.fillRect(0, 0, w, h);
-
-    // Subtle gradient for depth.
-    const gradient = ctx.createLinearGradient(
-      0, 0, 0, h
-    );
-
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
     gradient.addColorStop(0, "#101b30");
     gradient.addColorStop(1, "#080d18");
 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
 
-    // Background grid.
     ctx.strokeStyle = "rgba(56,189,248,0.035)";
     ctx.lineWidth = 1;
 
@@ -195,51 +179,27 @@ export class Render {
 
       let color = brick.color;
 
-      switch (brick.type) {
-        case "armored":
-          color = "#64748b";
-          break;
-
-        case "explosive":
-          color = "#be123c";
-          break;
-
-        case "permanent":
-          color = "#334155";
-          break;
-      }
+      if (brick.type === "armored") color = "#64748b";
+      if (brick.type === "explosive") color = "#be123c";
+      if (brick.type === "permanent") color = "#334155";
 
       ctx.fillStyle = color;
       ctx.shadowColor = color;
-      ctx.shadowBlur = brick.type === "permanent"
-        ? 3
-        : 11;
+      ctx.shadowBlur =
+        brick.type === "permanent" ? 3 : 11;
 
       ctx.fillRect(x, y, width, height);
-
       ctx.shadowBlur = 0;
 
-      // Reflective highlight.
       ctx.fillStyle = "rgba(255,255,255,0.22)";
-      ctx.fillRect(
-        x + 2,
-        y + 2,
-        width - 4,
-        3
-      );
+      ctx.fillRect(x + 2, y + 2, width - 4, 3);
 
-      switch (brick.type) {
-        case "armored":
-          this.drawArmoredBrick(brick);
-          break;
-
-        case "explosive":
-          this.drawExplosiveBrick(brick);
-          break;
-
-        case "permanent":
-          this.drawPermanentBrick(brick);
-          break;
+      if (brick.type === "armored") {
+        this.drawArmoredBrick(brick);
+      } else if (brick.type === "explosive") {
+        this.drawExplosiveBrick(brick);
+      } else if (brick.type === "permanent") {
+        this.drawPermanentBrick(brick);
       }
     }
   }
@@ -250,24 +210,15 @@ export class Render {
 
     ctx.strokeStyle = "#cbd5e1";
     ctx.lineWidth = 2;
-
-    ctx.strokeRect(
-      x + 3,
-      y + 3,
-      width - 6,
-      height - 6
-    );
+    ctx.strokeRect(x + 3, y + 3, width - 6, height - 6);
 
     if (brick.health < brick.maxHealth) {
       ctx.beginPath();
-
-      ctx.moveTo(x + width * 0.30, y + 2);
-      ctx.lineTo(x + width * 0.42, y + height * 0.40);
-      ctx.lineTo(x + width * 0.36, y + height * 0.70);
+      ctx.moveTo(x + width * 0.3, y + 2);
+      ctx.lineTo(x + width * 0.42, y + height * 0.4);
+      ctx.lineTo(x + width * 0.36, y + height * 0.7);
       ctx.lineTo(x + width * 0.56, y + height - 2);
-
       ctx.strokeStyle = "#f8fafc";
-      ctx.lineWidth = 2;
       ctx.stroke();
     }
   }
@@ -276,7 +227,8 @@ export class Render {
     const ctx = this.ctx;
 
     ctx.fillStyle = "#fff1f2";
-    ctx.font = `bold ${Math.min(16, brick.height - 2)}px Arial`;
+    ctx.font =
+      `bold ${Math.min(16, brick.height - 2)}px Arial`;
     ctx.textAlign = "center";
 
     ctx.fillText(
@@ -292,22 +244,14 @@ export class Render {
 
     ctx.strokeStyle = "#94a3b8";
     ctx.lineWidth = 2;
+    ctx.strokeRect(x + 2, y + 2, width - 4, height - 4);
 
-    ctx.strokeRect(
-      x + 2,
-      y + 2,
-      width - 4,
-      height - 4
-    );
-
-    // Diagonal metallic markings.
     ctx.strokeStyle = "rgba(203,213,225,0.45)";
     ctx.lineWidth = 1.5;
-
     ctx.beginPath();
+
     ctx.moveTo(x + width * 0.25, y + height - 3);
     ctx.lineTo(x + width * 0.45, y + 3);
-
     ctx.moveTo(x + width * 0.55, y + height - 3);
     ctx.lineTo(x + width * 0.75, y + 3);
 
@@ -315,55 +259,37 @@ export class Render {
   }
 
   // ========================================================
-  // Moving Defensive Paddle
+  // Defender
   // ========================================================
 
   drawDefender() {
-    const defender = this.game.defender;
-
-    if (!defender || !defender.active) return;
+    const d = this.game.defender;
+    if (!d?.active) return;
 
     const ctx = this.ctx;
 
     ctx.save();
-
     ctx.shadowColor = "#fb7185";
     ctx.shadowBlur = 18;
-
     ctx.fillStyle = "#e11d48";
+    ctx.fillRect(d.x, d.y, d.width, d.height);
 
-    ctx.fillRect(
-      defender.x,
-      defender.y,
-      defender.width,
-      defender.height
-    );
-
-    // Bright upper edge.
     ctx.fillStyle = "#fecdd3";
+    ctx.fillRect(d.x + 3, d.y + 2, d.width - 6, 3);
 
-    ctx.fillRect(
-      defender.x + 3,
-      defender.y + 2,
-      defender.width - 6,
-      3
-    );
-
-    // Small illuminated center.
     ctx.fillStyle = "#ffffff";
-
     ctx.fillRect(
-      defender.x + defender.width / 2 - 8,
-      defender.y + 4,
+      d.x + d.width / 2 - 8,
+      d.y + 4,
       16,
-      Math.max(2, defender.height - 8)
+      Math.max(2, d.height - 8)
     );
 
     ctx.restore();
   }
 
   // ========================================================
-  // Falling Power-ups
+  // Power-ups and Lasers
   // ========================================================
 
   drawPowerUps() {
@@ -371,55 +297,38 @@ export class Render {
 
     for (const power of this.game.powers) {
       const info = POWER_INFO[power.type];
-
       if (!info) continue;
 
       ctx.save();
-
       ctx.translate(power.x, power.y);
       ctx.rotate(this.game.time * 0.8);
 
       ctx.fillStyle = info.color;
       ctx.shadowColor = info.color;
       ctx.shadowBlur = 16;
-
       ctx.fillRect(-11, -11, 22, 22);
-
       ctx.restore();
 
       ctx.fillStyle = "#080d18";
       ctx.font = "bold 14px Arial";
       ctx.textAlign = "center";
-
-      ctx.fillText(
-        info.label,
-        power.x,
-        power.y + 5
-      );
+      ctx.fillText(info.label, power.x, power.y + 5);
     }
   }
-
-  // ========================================================
-  // Laser Projectiles
-  // ========================================================
 
   drawShots() {
     const ctx = this.ctx;
 
+    ctx.save();
     ctx.shadowBlur = 12;
     ctx.shadowColor = "#fb7185";
     ctx.fillStyle = "#fb7185";
 
     for (const shot of this.game.shots) {
-      ctx.fillRect(
-        shot.x - 2,
-        shot.y - 12,
-        4,
-        16
-      );
+      ctx.fillRect(shot.x - 2, shot.y - 12, 4, 16);
     }
 
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   // ========================================================
@@ -428,41 +337,27 @@ export class Render {
 
   drawPaddle() {
     const ctx = this.ctx;
-    const game = this.game;
-    const paddle = game.paddle;
+    const p = this.game.paddle;
 
-    const laserActive = game.effects.laser > 0;
+    const color =
+      this.game.effects.laser > 0 ||
+      this.game.cheats?.flags.laser
+        ? "#fb7185"
+        : "#38bdf8";
 
-    const color = laserActive
-      ? "#fb7185"
-      : "#38bdf8";
-
+    ctx.save();
     ctx.shadowColor = color;
     ctx.shadowBlur = 20;
-
     ctx.fillStyle = color;
-
-    ctx.fillRect(
-      paddle.x,
-      paddle.y,
-      paddle.width,
-      paddle.height
-    );
+    ctx.fillRect(p.x, p.y, p.width, p.height);
 
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-
-    ctx.fillRect(
-      paddle.x + 3,
-      paddle.y + 2,
-      paddle.width - 6,
-      3
-    );
-
-    ctx.shadowBlur = 0;
+    ctx.fillRect(p.x + 3, p.y + 2, p.width - 6, 3);
+    ctx.restore();
   }
 
   // ========================================================
-  // Balls and Trails
+  // Balls and Particle Effects
   // ========================================================
 
   drawBalls() {
@@ -476,7 +371,6 @@ export class Render {
         const progress = (i + 1) / trail.length;
 
         ctx.beginPath();
-
         ctx.arc(
           point.x,
           point.y,
@@ -486,144 +380,109 @@ export class Render {
         );
 
         ctx.fillStyle =
-          `rgba(125,211,252,${progress * 0.20})`;
-
+          `rgba(125,211,252,${progress * 0.2})`;
         ctx.fill();
       }
 
+      ctx.save();
       ctx.beginPath();
-
-      ctx.arc(
-        ball.x,
-        ball.y,
-        ball.radius,
-        0,
-        Math.PI * 2
-      );
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
 
       ctx.fillStyle = "#ffffff";
       ctx.shadowColor = "#7dd3fc";
       ctx.shadowBlur = 16;
-
       ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.restore();
     }
   }
-
-  // ========================================================
-  // Particle Effects
-  // ========================================================
 
   drawParticles() {
     const ctx = this.ctx;
 
-    for (const particle of this.game.particles) {
+    ctx.save();
+
+    for (const p of this.game.particles) {
       ctx.globalAlpha = Math.max(
         0,
-        Math.min(
-          1,
-          particle.life / particle.maxLife
-        )
+        Math.min(1, p.life / p.maxLife)
       );
 
-      ctx.fillStyle = particle.color;
-
+      ctx.fillStyle = p.color;
       ctx.beginPath();
-
-      ctx.arc(
-        particle.x,
-        particle.y,
-        particle.radius,
-        0,
-        Math.PI * 2
-      );
-
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   // ========================================================
-  // HUD
+  // HUD and Notifications
   // ========================================================
 
   drawHUD() {
     const ctx = this.ctx;
     const game = this.game;
-
     const w = game.width;
-    const h = game.height;
 
-    const portrait = game.layout === "portrait";
-    const fontSize = portrait ? 16 : 17;
+    const fontSize =
+      game.layout === "portrait" ? 16 : 17;
 
     ctx.font = `bold ${fontSize}px Arial`;
     ctx.fillStyle = "#e2e8f0";
 
-    // Score.
     ctx.textAlign = "left";
-
     ctx.fillText(
-      `SCORE ${game.score.toString().padStart(5, "0")}`,
+      `SCORE ${String(game.score).padStart(5, "0")}`,
       16,
       29
     );
 
-    // Level.
     ctx.textAlign = "center";
-
     ctx.fillText(
       `LV ${game.level}/${game.maxLevel}`,
       w / 2,
       29
     );
 
-    // Lives.
     ctx.textAlign = "right";
+    ctx.fillText(`♥ ${game.lives}`, w - 16, 29);
 
-    ctx.fillText(
-      `♥ ${game.lives}`,
-      w - 16,
-      29
-    );
-
-    // Active power-up timers.
-    const activeEffects = Object.entries(game.effects)
+    const effects = Object.entries(game.effects)
       .filter(([, remaining]) => remaining > 0);
 
-    if (activeEffects.length) {
+    if (effects.length) {
       ctx.font = "bold 12px Arial";
       ctx.textAlign = "left";
 
-      activeEffects.forEach(([name, remaining], index) => {
+      effects.forEach(([name, remaining], index) => {
         const info = POWER_INFO[name];
-
         if (!info) return;
 
         ctx.fillStyle = info.color;
 
+        const duration =
+          name === "laser" && game.cheats?.flags.laser
+            ? "∞"
+            : `${Math.ceil(remaining)}s`;
+
         ctx.fillText(
-          `${name.toUpperCase()} ${Math.ceil(remaining)}s`,
+          `${name.toUpperCase()} ${duration}`,
           16 + index * 122,
-          h - 12
+          game.height - 12
         );
       });
     }
   }
 
-  // ========================================================
-  // Temporary Notifications
-  // ========================================================
-
   drawBanner() {
     const game = this.game;
     const ctx = this.ctx;
 
+    ctx.save();
     ctx.textAlign = "center";
     ctx.font = "bold 24px Arial";
     ctx.fillStyle = "#facc15";
-
     ctx.shadowColor = "#facc15";
     ctx.shadowBlur = 12;
 
@@ -633,17 +492,16 @@ export class Render {
       game.height * 0.67
     );
 
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   // ========================================================
-  // Start, Pause, and Game Over Screens
+  // Standard Game Menus
   // ========================================================
 
   drawMenu(title, subtitle, showInstructions) {
     const game = this.game;
     const ctx = this.ctx;
-
     const w = game.width;
     const h = game.height;
 
@@ -665,31 +523,22 @@ export class Render {
         ? 37
         : 45;
 
+    ctx.save();
     ctx.textAlign = "center";
     ctx.shadowColor = "#38bdf8";
     ctx.shadowBlur = 18;
-
     ctx.fillStyle = "#ffffff";
     ctx.font = `bold ${titleSize}px Arial`;
-
-    ctx.fillText(
-      title,
-      w / 2,
-      titleY
-    );
+    ctx.fillText(title, w / 2, titleY);
 
     ctx.shadowBlur = 0;
-
     ctx.fillStyle = "#38bdf8";
     ctx.font = "bold 15px Arial";
-
-    ctx.fillText(
-      subtitle,
-      w / 2,
-      titleY + 35
-    );
+    ctx.fillText(subtitle, w / 2, titleY + 35);
+    ctx.restore();
 
     if (!showInstructions) {
+      ctx.textAlign = "center";
       ctx.fillStyle = "#94a3b8";
       ctx.font = "14px Arial";
 
@@ -704,11 +553,7 @@ export class Render {
       return;
     }
 
-    this.drawInstructions(
-      landscape,
-      portrait,
-      titleY
-    );
+    this.drawInstructions(landscape, portrait, titleY);
   }
 
   drawInstructions(landscape, portrait, titleY) {
@@ -736,38 +581,27 @@ export class Render {
     if (landscape) {
       const leftX = game.width * 0.28;
       const rightX = game.width * 0.72;
-
       const startY = titleY + 82;
 
       instructions.forEach(([label, description], index) => {
         const col = index % 2;
         const row = Math.floor(index / 2);
-
-        const x = col === 0
-          ? leftX
-          : rightX;
-
+        const x = col === 0 ? leftX : rightX;
         const y = startY + row * 58;
 
         ctx.textAlign = "center";
-
         ctx.fillStyle = "#38bdf8";
         ctx.font = "bold 12px Arial";
         ctx.fillText(label, x, y);
 
         ctx.fillStyle = "#cbd5e1";
         ctx.font = "12px Arial";
-        ctx.fillText(
-          description,
-          x,
-          y + 19
-        );
+        ctx.fillText(description, x, y + 19);
       });
 
       ctx.fillStyle = "#94a3b8";
       ctx.font = "12px Arial";
       ctx.textAlign = "center";
-
       ctx.fillText(
         "Break bricks • Collect power-ups • Clear all 30 levels",
         game.width / 2,
@@ -786,31 +620,351 @@ export class Render {
         ctx.textAlign = "center";
         ctx.fillStyle = "#38bdf8";
         ctx.font = "bold 12px Arial";
-        ctx.fillText(
-          label,
-          game.width / 2,
-          y
-        );
+        ctx.fillText(label, game.width / 2, y);
 
         ctx.fillStyle = "#cbd5e1";
         ctx.font = portrait ? "13px Arial" : "14px Arial";
-
-        ctx.fillText(
-          description,
-          game.width / 2,
-          y + 18
-        );
+        ctx.fillText(description, game.width / 2, y + 18);
       });
 
       ctx.fillStyle = "#94a3b8";
       ctx.font = portrait ? "12px Arial" : "13px Arial";
       ctx.textAlign = "center";
-
       ctx.fillText(
         "30 levels • Special bricks • Power-ups",
         game.width / 2,
         startY + instructions.length * spacing + 16
       );
     }
+  }
+
+  // ========================================================
+  // Victory Celebration
+  // ========================================================
+
+  resetVictory() {
+    this.victoryParticles = [];
+    this.victoryStart = 0;
+    this.lastVictoryFrame = 0;
+    this.victoryRunId = null;
+    this.victoryBursts = 0;
+  }
+
+  startVictory(now) {
+    this.victoryStart = now;
+    this.lastVictoryFrame = now;
+    this.victoryParticles = [];
+    this.victoryBursts = 0;
+    this.victoryRunId = this.game.runId;
+
+    // Initial celebration burst.
+    const w = this.game.width;
+    const h = this.game.height;
+
+    this.spawnFirework(w * 0.25, h * 0.35, 35);
+    this.spawnFirework(w * 0.75, h * 0.3, 35);
+    this.spawnFirework(w * 0.5, h * 0.22, 45);
+  }
+
+  spawnFirework(x, y, count = 35) {
+    const color =
+      CELEBRATION_COLORS[
+        Math.floor(Math.random() * CELEBRATION_COLORS.length)
+      ];
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const speed = 50 + Math.random() * 155;
+      const life = 0.9 + Math.random() * 1.1;
+
+      this.victoryParticles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life,
+        maxLife: life,
+        size: 2 + Math.random() * 2.5,
+        color,
+        confetti: false,
+        rotation: 0,
+        spin: 0
+      });
+    }
+  }
+
+  spawnConfetti(count = 8) {
+    const w = this.game.width;
+
+    for (let i = 0; i < count; i++) {
+      const life = 3 + Math.random() * 3;
+
+      this.victoryParticles.push({
+        x: Math.random() * w,
+        y: -15 - Math.random() * 45,
+        vx: (Math.random() - 0.5) * 65,
+        vy: 55 + Math.random() * 85,
+        life,
+        maxLife: life,
+        size: 3 + Math.random() * 4,
+        color: CELEBRATION_COLORS[
+          Math.floor(Math.random() * CELEBRATION_COLORS.length)
+        ],
+        confetti: true,
+        rotation: Math.random() * Math.PI,
+        spin: (Math.random() - 0.5) * 5
+      });
+    }
+  }
+
+  updateVictory(now) {
+    if (
+      !this.victoryStart ||
+      this.victoryRunId !== this.game.runId
+    ) {
+      this.startVictory(now);
+    }
+
+    const dt = Math.min(
+      0.05,
+      Math.max(0, (now - this.lastVictoryFrame) / 1000)
+    );
+
+    this.lastVictoryFrame = now;
+
+    const elapsed = (now - this.victoryStart) / 1000;
+
+    // Additional fireworks during the opening celebration.
+    const targetBursts = Math.min(
+      12,
+      Math.floor(elapsed * 2)
+    );
+
+    while (this.victoryBursts < targetBursts) {
+      this.victoryBursts++;
+
+      const w = this.game.width;
+      const h = this.game.height;
+
+      this.spawnFirework(
+        w * (0.12 + Math.random() * 0.76),
+        h * (0.12 + Math.random() * 0.38),
+        25 + Math.floor(Math.random() * 20)
+      );
+    }
+
+    // Keep a gentle rain of confetti going afterward.
+    if (Math.random() < dt * 11) {
+      this.spawnConfetti(5);
+    }
+
+    for (const p of this.victoryParticles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rotation += p.spin * dt;
+
+      if (p.confetti) {
+        p.vx += Math.sin(now * 0.002 + p.y * 0.03) * dt * 12;
+      } else {
+        p.vx *= Math.max(0, 1 - dt * 0.8);
+        p.vy += 60 * dt;
+      }
+
+      p.life -= dt;
+    }
+
+    this.victoryParticles = this.victoryParticles.filter(
+      p =>
+        p.life > 0 &&
+        p.y < this.game.height + 30
+    );
+
+    if (this.victoryParticles.length > 350) {
+      this.victoryParticles.splice(
+        0,
+        this.victoryParticles.length - 350
+      );
+    }
+  }
+
+  drawVictoryParticles() {
+    const ctx = this.ctx;
+
+    ctx.save();
+
+    for (const p of this.victoryParticles) {
+      const alpha = Math.max(
+        0,
+        Math.min(1, p.life / p.maxLife)
+      );
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+
+      if (p.confetti) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.fillRect(
+          -p.size / 2,
+          -p.size,
+          p.size,
+          p.size * 2
+        );
+        ctx.restore();
+      } else {
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 7;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    ctx.restore();
+  }
+
+  drawVictory() {
+    const game = this.game;
+    const ctx = this.ctx;
+
+    const w = game.width;
+    const h = game.height;
+
+    const landscape = game.layout === "landscape";
+    const portrait = game.layout === "portrait";
+
+    const now = performance.now();
+    this.updateVictory(now);
+
+    // Deep navy overlay with a subtle gold glow.
+    ctx.fillStyle = "rgba(3,7,18,0.95)";
+    ctx.fillRect(0, 0, w, h);
+
+    const glow = ctx.createRadialGradient(
+      w / 2, h * 0.42, 15,
+      w / 2, h * 0.42, w * 0.65
+    );
+
+    glow.addColorStop(0, "rgba(250,204,21,0.13)");
+    glow.addColorStop(0.5, "rgba(56,189,248,0.045)");
+    glow.addColorStop(1, "rgba(3,7,18,0)");
+
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+
+    // Animated effects behind the victory text.
+    this.drawVictoryParticles();
+
+    const elapsed = (now - this.victoryStart) / 1000;
+    const pulse = 0.85 + Math.sin(elapsed * 2.6) * 0.15;
+
+    const centerY = landscape
+      ? h * 0.42
+      : portrait
+        ? h * 0.42
+        : h * 0.43;
+
+    const titleSize = portrait ? 34 : landscape ? 40 : 52;
+    const sectionGap = landscape ? 42 : 52;
+
+    ctx.save();
+    ctx.textAlign = "center";
+
+    // Victory star.
+    ctx.font = landscape ? "37px Arial" : "48px Arial";
+    ctx.fillStyle = "#facc15";
+    ctx.shadowColor = "#facc15";
+    ctx.shadowBlur = 20 * pulse;
+    ctx.fillText("★", w / 2, centerY - sectionGap * 2);
+
+    // Main heading.
+    ctx.font = `900 ${titleSize}px Arial`;
+    ctx.shadowBlur = 25 * pulse;
+    ctx.fillStyle = "#facc15";
+    ctx.fillText(
+      "VICTORY!",
+      w / 2,
+      centerY - sectionGap
+    );
+
+    ctx.shadowBlur = 0;
+
+    // Campaign accomplishment.
+    ctx.font = `bold ${landscape ? 18 : 20}px Arial`;
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillText(
+      "CAMPAIGN COMPLETE",
+      w / 2,
+      centerY
+    );
+
+    ctx.font = `bold ${landscape ? 14 : 16}px Arial`;
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillText(
+      "ALL 30 LEVELS CLEARED",
+      w / 2,
+      centerY + sectionGap * 0.62
+    );
+
+    // Decorative gold rule.
+    const ruleY = centerY + sectionGap * 0.9;
+    ctx.strokeStyle = "rgba(250,204,21,0.65)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.33, ruleY);
+    ctx.lineTo(w * 0.67, ruleY);
+    ctx.stroke();
+
+    // Final score.
+    const scoreY = centerY + sectionGap * 1.55;
+
+    ctx.font = "bold 13px Arial";
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText("FINAL SCORE", w / 2, scoreY);
+
+    ctx.font = `900 ${landscape ? 29 : 37}px Arial`;
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "#38bdf8";
+    ctx.shadowBlur = 12;
+
+    ctx.fillText(
+      game.score.toLocaleString("en-US"),
+      w / 2,
+      scoreY + (landscape ? 32 : 42)
+    );
+
+    ctx.shadowBlur = 0;
+
+    // Different messages for cheat-assisted victories.
+    const eligible =
+      typeof game.isLeaderboardEligible === "function"
+        ? game.isLeaderboardEligible()
+        : false;
+
+    ctx.font = `bold ${landscape ? 12 : 14}px Arial`;
+    ctx.fillStyle = eligible ? "#4ade80" : "#fbbf24";
+
+    ctx.fillText(
+      eligible
+        ? "LEGENDARY ARCADE RUN"
+        : "CHALLENGE COMPLETED",
+      w / 2,
+      scoreY + (landscape ? 55 : 73)
+    );
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = landscape ? "12px Arial" : "14px Arial";
+
+    ctx.fillText(
+      this.isMobile()
+        ? "TAP TO PLAY AGAIN"
+        : "PRESS SPACE OR CLICK TO PLAY AGAIN",
+      w / 2,
+      h - (landscape ? 19 : portrait ? 65 : 42)
+    );
+
+    ctx.restore();
   }
 }
