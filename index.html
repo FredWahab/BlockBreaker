@@ -10,7 +10,7 @@
 
   <meta
     name="description"
-    content="Play Block Breaker, a browser-based arcade game featuring special bricks, power-ups, multiple levels, and classic paddle-and-ball gameplay. Created by Fred Wahab."
+    content="Play Block Breaker, a 30-level browser arcade game featuring special bricks, power-ups, moving obstacles, high scores, and classic paddle-and-ball gameplay. Created by Fred Wahab."
   />
 
   <meta name="author" content="Fred Wahab" />
@@ -46,6 +46,7 @@
       ></canvas>
 
       <div class="game-controls" aria-label="Game controls">
+
         <button
           id="pauseButton"
           type="button"
@@ -63,15 +64,23 @@
         </button>
 
         <button
+          id="highScoresButton"
+          type="button"
+          aria-label="View arcade high scores"
+        >
+          High Scores
+        </button>
+
+        <button
           id="restartButton"
           type="button"
           aria-label="Restart the game"
         >
           Restart
         </button>
+
       </div>
     </section>
-
   </main>
 
   <footer class="site-footer">

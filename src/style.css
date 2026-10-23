@@ -1,17 +1,39 @@
 
 /* ==========================================================
    BLOCK BREAKER — ARCADE EDITION
-   Responsive Desktop / Mobile Styles
+
+   Responsive game layout
+   Neon arcade leaderboard
+   High-score name entry
+   Desktop and mobile support
+   ========================================================== */
+
+/* ==========================================================
+   Theme
    ========================================================== */
 
 :root {
   font-family: Arial, Helvetica, sans-serif;
+
   color: #e2e8f0;
   background-color: #080d18;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+
+  --arcade-bg: #080d18;
+  --arcade-panel: #101b30;
+  --arcade-panel-light: #1e293b;
+
+  --arcade-cyan: #38bdf8;
+  --arcade-gold: #facc15;
+  --arcade-green: #4ade80;
+  --arcade-red: #fb7185;
+
+  --arcade-text: #e2e8f0;
+  --arcade-muted: #94a3b8;
+  --arcade-border: #475569;
 }
 
 * {
@@ -30,15 +52,18 @@ body {
   min-width: 280px;
   min-height: 100vh;
 
-  background:
-    radial-gradient(
-      ellipse at 50% 0%,
-      #203155 0%,
-      #101827 48%,
-      #080c17 100%
-    );
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    #203155 0%,
+    #101827 48%,
+    #080c17 100%
+  );
 
-  color: #e2e8f0;
+  color: var(--arcade-text);
+}
+
+[hidden] {
+  display: none !important;
 }
 
 /* ==========================================================
@@ -88,7 +113,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.28em;
 
-  color: #38bdf8;
+  color: var(--arcade-cyan);
 }
 
 /* ==========================================================
@@ -113,9 +138,9 @@ body {
   width: 100%;
   height: auto;
 
-  background: #080d18;
+  background: var(--arcade-bg);
 
-  border: 1px solid #475569;
+  border: 1px solid var(--arcade-border);
   border-radius: 10px;
 
   box-shadow:
@@ -151,11 +176,11 @@ body {
 
   padding: 10px 18px;
 
-  border: 1px solid #475569;
+  border: 1px solid var(--arcade-border);
   border-radius: 8px;
 
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--arcade-panel-light);
+  color: var(--arcade-text);
 
   font-family: inherit;
   font-size: 0.88rem;
@@ -172,7 +197,7 @@ body {
 
 .game-controls button:hover {
   background: #334155;
-  border-color: #38bdf8;
+  border-color: var(--arcade-cyan);
   color: #ffffff;
 }
 
@@ -181,7 +206,7 @@ body {
 }
 
 .game-controls button:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--arcade-cyan);
   outline-offset: 3px;
 }
 
@@ -202,11 +227,11 @@ body {
   font-size: 0.85rem;
   text-align: center;
 
-  color: #94a3b8;
+  color: var(--arcade-muted);
 }
 
 .site-footer a {
-  color: #38bdf8;
+  color: var(--arcade-cyan);
   text-decoration: none;
 
   transition: color 0.2s ease;
@@ -218,7 +243,528 @@ body {
 }
 
 .site-footer a:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--arcade-cyan);
+  outline-offset: 3px;
+}
+
+/* ==========================================================
+   Leaderboard Overlay
+   ========================================================== */
+
+.arcade-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 18px;
+
+  background: rgba(3, 7, 18, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ==========================================================
+   Leaderboard Modal
+   ========================================================== */
+
+.arcade-modal {
+  position: relative;
+
+  width: 100%;
+  max-width: 540px;
+  max-height: calc(100dvh - 36px);
+
+  margin: auto;
+  padding: 28px 28px 24px;
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  background: linear-gradient(
+    160deg,
+    #152440 0%,
+    #101b30 45%,
+    #080d18 100%
+  );
+
+  border: 2px solid var(--arcade-cyan);
+  border-radius: 14px;
+
+  box-shadow:
+    0 0 0 4px rgba(56, 189, 248, 0.08),
+    0 0 25px rgba(56, 189, 248, 0.22),
+    0 0 70px rgba(56, 189, 248, 0.12),
+    0 24px 70px rgba(0, 0, 0, 0.7);
+
+  color: var(--arcade-text);
+}
+
+.arcade-modal::before {
+  content: "";
+
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+
+  height: 2px;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--arcade-cyan),
+    transparent
+  );
+
+  box-shadow:
+    0 0 15px var(--arcade-cyan);
+}
+
+.arcade-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+
+  width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid var(--arcade-border);
+  border-radius: 7px;
+
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--arcade-muted);
+
+  font-size: 23px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.arcade-close:hover {
+  color: #ffffff;
+  border-color: var(--arcade-cyan);
+
+  box-shadow:
+    0 0 12px rgba(56, 189, 248, 0.25);
+}
+
+/* ==========================================================
+   Arcade Header
+   ========================================================== */
+
+.arcade-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.arcade-kicker {
+  margin-bottom: 7px;
+
+  color: var(--arcade-gold);
+
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+
+  text-shadow:
+    0 0 12px rgba(250, 204, 21, 0.45);
+}
+
+.arcade-header h2 {
+  margin: 0;
+
+  color: var(--arcade-cyan);
+
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
+  font-weight: 900;
+  letter-spacing: 0.13em;
+
+  text-shadow:
+    0 0 12px rgba(56, 189, 248, 0.6),
+    0 0 28px rgba(56, 189, 248, 0.25);
+}
+
+.arcade-subtitle {
+  margin: 9px 0 0;
+
+  color: var(--arcade-muted);
+
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+/* ==========================================================
+   High-Score Name Entry
+   ========================================================== */
+
+.arcade-entry {
+  text-align: center;
+}
+
+.arcade-trophy {
+  margin-bottom: 6px;
+
+  color: var(--arcade-gold);
+  font-size: 2.6rem;
+  line-height: 1;
+
+  text-shadow:
+    0 0 16px rgba(250, 204, 21, 0.7),
+    0 0 35px rgba(250, 204, 21, 0.3);
+}
+
+.arcade-entry h3 {
+  margin: 10px 0 12px;
+
+  color: var(--arcade-gold);
+
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+
+  text-shadow:
+    0 0 14px rgba(250, 204, 21, 0.45);
+}
+
+.arcade-entry-score {
+  margin: 10px 0 16px;
+
+  color: #ffffff;
+
+  font-size: clamp(2rem, 7vw, 3rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+
+  text-shadow:
+    0 0 15px rgba(56, 189, 248, 0.55);
+}
+
+.arcade-entry-prompt {
+  margin: 0 0 12px;
+
+  color: var(--arcade-cyan);
+
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.arcade-entry-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  gap: 10px;
+}
+
+.arcade-name-input {
+  width: 100%;
+  max-width: 250px;
+  height: 66px;
+
+  padding: 12px 15px;
+
+  border: 2px solid var(--arcade-cyan);
+  border-radius: 9px;
+
+  background: #080d18;
+  color: #ffffff;
+
+  font-family: "Courier New", monospace;
+  font-size: 2rem;
+  font-weight: 900;
+
+  letter-spacing: 0.25em;
+  text-align: center;
+  text-transform: uppercase;
+
+  caret-color: var(--arcade-gold);
+
+  box-shadow:
+    inset 0 0 20px rgba(56, 189, 248, 0.05),
+    0 0 15px rgba(56, 189, 248, 0.17);
+}
+
+.arcade-name-input::placeholder {
+  color: #475569;
+}
+
+.arcade-name-input:focus {
+  outline: none;
+
+  border-color: var(--arcade-gold);
+
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.10),
+    0 0 25px rgba(250, 204, 21, 0.25);
+}
+
+.arcade-name-hint {
+  color: var(--arcade-muted);
+
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.arcade-entry-error {
+  min-height: 17px;
+
+  color: var(--arcade-red);
+
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.arcade-submit {
+  width: 100%;
+  max-width: 250px;
+  min-height: 46px;
+
+  padding: 12px 20px;
+
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+
+  background: var(--arcade-cyan);
+  color: #080d18;
+
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 0 18px rgba(56, 189, 248, 0.28);
+
+  transition:
+    transform 0.15s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.arcade-submit:hover {
+  background: #7dd3fc;
+
+  box-shadow:
+    0 0 25px rgba(56, 189, 248, 0.5);
+}
+
+.arcade-submit:active {
+  transform: scale(0.97);
+}
+
+.arcade-entry-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  margin-top: 22px;
+  padding-top: 16px;
+
+  border-top: 1px solid #334155;
+
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.arcade-entry-rank {
+  color: var(--arcade-gold);
+}
+
+.arcade-entry-level {
+  color: var(--arcade-green);
+}
+
+/* ==========================================================
+   Leaderboard Table
+   ========================================================== */
+
+.arcade-scores {
+  width: 100%;
+}
+
+.arcade-table-header,
+.arcade-score-row {
+  display: grid;
+
+  grid-template-columns:
+    54px
+    minmax(75px, 1fr)
+    minmax(85px, 1.3fr)
+    48px;
+
+  align-items: center;
+  column-gap: 8px;
+}
+
+.arcade-table-header {
+  padding: 11px 9px;
+
+  border-bottom: 1px solid var(--arcade-cyan);
+
+  color: var(--arcade-cyan);
+
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.arcade-table-header span:nth-child(3),
+.arcade-table-header span:nth-child(4) {
+  text-align: right;
+}
+
+.arcade-score-list {
+  width: 100%;
+}
+
+.arcade-score-row {
+  position: relative;
+
+  min-height: 39px;
+  padding: 9px;
+
+  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+
+  font-family: "Courier New", monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.arcade-score-row:nth-child(even) {
+  background: rgba(148, 163, 184, 0.035);
+}
+
+.arcade-score-rank {
+  color: var(--arcade-muted);
+}
+
+.arcade-score-name {
+  color: #f8fafc;
+
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.arcade-score-value,
+.arcade-score-level {
+  text-align: right;
+}
+
+.arcade-score-value {
+  color: #e2e8f0;
+}
+
+.arcade-score-level {
+  color: #94a3b8;
+}
+
+.arcade-score-first {
+  background: rgba(250, 204, 21, 0.06) !important;
+}
+
+.arcade-score-first .arcade-score-rank,
+.arcade-score-first .arcade-score-name,
+.arcade-score-first .arcade-score-value {
+  color: var(--arcade-gold);
+
+  text-shadow:
+    0 0 10px rgba(250, 204, 21, 0.3);
+}
+
+.arcade-score-new {
+  background: rgba(56, 189, 248, 0.12) !important;
+
+  border-left: 3px solid var(--arcade-cyan);
+
+  box-shadow:
+    inset 0 0 16px rgba(56, 189, 248, 0.07);
+}
+
+.arcade-score-new .arcade-score-name,
+.arcade-score-new .arcade-score-value {
+  color: var(--arcade-cyan);
+
+  text-shadow:
+    0 0 12px rgba(56, 189, 248, 0.45);
+}
+
+.arcade-score-empty {
+  opacity: 0.45;
+}
+
+.arcade-scores-note {
+  margin: 17px 0 0;
+
+  color: var(--arcade-muted);
+
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+/* ==========================================================
+   Back Button
+   ========================================================== */
+
+.arcade-back {
+  display: block;
+
+  width: 100%;
+  min-height: 44px;
+
+  margin-top: 23px;
+  padding: 12px 18px;
+
+  border: 1px solid var(--arcade-border);
+  border-radius: 8px;
+
+  background: var(--arcade-panel-light);
+  color: var(--arcade-text);
+
+  font-family: inherit;
+  font-size: 0.83rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.arcade-back:hover {
+  background: #334155;
+  color: #ffffff;
+  border-color: var(--arcade-cyan);
+}
+
+.arcade-close:focus-visible,
+.arcade-back:focus-visible,
+.arcade-submit:focus-visible {
+  outline: 2px solid var(--arcade-gold);
   outline-offset: 3px;
 }
 
@@ -256,6 +802,10 @@ body {
   .site-footer {
     min-height: 52px;
     padding: 10px 12px;
+  }
+
+  .arcade-modal {
+    max-width: 500px;
   }
 }
 
@@ -322,6 +872,66 @@ body {
     padding: 8px 12px;
     font-size: 0.75rem;
   }
+
+  .arcade-overlay {
+    padding: 10px;
+  }
+
+  .arcade-modal {
+    max-height: calc(100dvh - 20px);
+
+    padding: 23px 14px 17px;
+
+    border-radius: 10px;
+  }
+
+  .arcade-header {
+    margin-bottom: 19px;
+  }
+
+  .arcade-kicker {
+    font-size: 0.65rem;
+  }
+
+  .arcade-header h2 {
+    font-size: 1.7rem;
+  }
+
+  .arcade-table-header,
+  .arcade-score-row {
+    grid-template-columns:
+      38px
+      minmax(48px, 1fr)
+      minmax(76px, 1.4fr)
+      34px;
+
+    column-gap: 5px;
+  }
+
+  .arcade-table-header {
+    padding: 9px 4px;
+    font-size: 0.63rem;
+  }
+
+  .arcade-score-row {
+    min-height: 37px;
+    padding: 8px 4px;
+
+    font-size: 0.79rem;
+  }
+
+  .arcade-name-input {
+    height: 61px;
+    font-size: 1.8rem;
+  }
+
+  .arcade-entry-score {
+    font-size: 2.1rem;
+  }
+
+  .arcade-entry-footer {
+    font-size: 0.73rem;
+  }
 }
 
 /* ==========================================================
@@ -344,12 +954,11 @@ body {
     justify-content: flex-start;
 
     gap: 4px;
-    padding: 4px 8px 4px;
+    padding: 4px 8px;
 
     overflow: hidden;
   }
 
-  /* Hide decorative title to maximize gameplay space. */
   .game-header {
     display: none;
   }
@@ -379,7 +988,6 @@ body {
     max-height: calc(100dvh - 65px);
 
     border-radius: 4px;
-
     box-shadow: none;
   }
 
@@ -401,9 +1009,88 @@ body {
     border-radius: 6px;
   }
 
-  /* Footer is hidden in landscape gameplay mode. */
   .site-footer {
     display: none;
+  }
+
+  /* Leaderboard can scroll independently in landscape. */
+  .arcade-overlay {
+    align-items: safe center;
+    padding: 7px 12px;
+  }
+
+  .arcade-modal {
+    max-width: 560px;
+    max-height: calc(100dvh - 14px);
+
+    padding: 17px 23px;
+  }
+
+  .arcade-header {
+    margin-bottom: 12px;
+  }
+
+  .arcade-kicker {
+    margin-bottom: 3px;
+    font-size: 0.65rem;
+  }
+
+  .arcade-header h2 {
+    font-size: 1.45rem;
+  }
+
+  .arcade-subtitle {
+    margin-top: 4px;
+  }
+
+  .arcade-score-row {
+    min-height: 31px;
+    padding: 6px 9px;
+  }
+
+  .arcade-table-header {
+    padding: 7px 9px;
+  }
+
+  .arcade-entry-score {
+    margin: 5px 0 9px;
+    font-size: 1.8rem;
+  }
+
+  .arcade-trophy {
+    font-size: 1.7rem;
+  }
+
+  .arcade-entry h3 {
+    margin: 4px 0 6px;
+    font-size: 1rem;
+  }
+
+  .arcade-entry-prompt {
+    margin-bottom: 7px;
+  }
+
+  .arcade-name-input {
+    height: 48px;
+    font-size: 1.5rem;
+  }
+
+  .arcade-entry-form {
+    gap: 6px;
+  }
+
+  .arcade-submit {
+    min-height: 38px;
+    padding: 8px;
+  }
+
+  .arcade-entry-footer {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  .arcade-back {
+    margin-top: 12px;
   }
 }
 
@@ -436,6 +1123,19 @@ body {
     padding: 4px 10px;
     font-size: 0.7rem;
   }
+
+  .arcade-modal {
+    padding: 12px 16px;
+  }
+
+  .arcade-header {
+    margin-bottom: 8px;
+  }
+
+  .arcade-score-row {
+    min-height: 28px;
+    padding: 5px 8px;
+  }
 }
 
 /* ==========================================================
@@ -444,7 +1144,9 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .game-controls button,
-  .site-footer a {
+  .site-footer a,
+  .arcade-submit,
+  .arcade-back {
     transition: none;
   }
 }
