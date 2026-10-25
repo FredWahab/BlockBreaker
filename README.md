@@ -367,4 +367,3 @@ Developed by **Fred Wahab**.
 
 Portfolio: [fredwahab.com](https://fredwahab.com)
 ```
-this is a readme edit.
